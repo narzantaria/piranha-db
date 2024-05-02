@@ -1,0 +1,38 @@
+{
+  "name": "piranha-db",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/narzantaria/piranha-db.git",
+  "author": "Nar Zantaria <narzantaria@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "crypto-js": "^4.2.0",
+    "fs-extra": "^11.2.0",
+    "jsonwebtoken": "^9.0.2",
+    "lodash": "^4.17.21",
+    "rimraf": "^5.0.5",
+    "serialize-javascript": "^6.0.2",
+    "util": "^0.12.5",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.1.1",
+    "@types/crypto-js": "^4.2.2",
+    "@types/fs-extra": "^11.0.4",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/lodash": "^4.17.0",
+    "@types/node": "^20.12.7",
+    "@types/serialize-javascript": "^5.0.4",
+    "@types/uuid": "^9.0.8",
+    "@typescript-eslint/parser": "^7.8.0",
+    "dotenv": "^16.4.5",
+    "eslint": "^9.1.1",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-unused-imports": "^3.2.0",
+    "globals": "^15.1.0",
+    "nodemon": "^3.1.0",
+    "prettier": "^3.2.5",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

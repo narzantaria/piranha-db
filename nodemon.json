@@ -1,0 +1,13 @@
+{
+  "verbose": true,
+  "ignore": [
+    "./megatron/",
+    "./dist/",
+    "./models/",
+    "./smodels/",
+    "./sdocs/",
+    "./data/",
+    "./logs/",
+    "./db/"
+  ]
+}
