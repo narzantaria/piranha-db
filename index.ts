@@ -3,18 +3,18 @@ import { DATA_DIR, ORM_DIR } from "./src/dirs";
 import { read, readdir, write } from "./src/promises";
 import { IObject, INumObject } from "./src/types";
 
-// парсит массив с полями из прочитанных данных в объект
+// parse array of lines to object
 function parseArrayToObject(arr: string[]): IObject {
   const obj: IObject = {};
   arr.forEach((item) => {
-    const [key, value] = item.split(": ");
+    const [key, value] = item.split(": "); // need to fix!
     obj[key] = value.slice(0, 1) === "!" ? value.slice(1, value.length) : value;
   });
   return obj;
 }
 
 /**
- * парсит поля типа gallery и тд
+ * Parses gallery and other fields
  **/
 function parseObjectFields(obj: IObject, model: IObject) {
   const keys = Object.keys(obj);
@@ -32,7 +32,7 @@ function parseObjectFields(obj: IObject, model: IObject) {
 }
 
 /**
- * Читает модель (ORM), и возвращает в виде IObject
+ * Read model (ORM), return IObject
  **/
 async function readModel(name: string): Promise<IObject> {
   const modelProxy = await read(`${ORM_DIR}/${name}.pxx`, "utf8");
@@ -62,7 +62,7 @@ async function readCollection(name: string): Promise<IObject[]> {
 }
 
 export async function bootstrap() {
-  // имена моделей
+  // model names
   const modelFiles = await readdir(ORM_DIR);
   const modelNames = modelFiles.map((x) => x.replace(/\.[^/.]+$/, ""));
 
@@ -71,23 +71,23 @@ export async function bootstrap() {
   const indexes: { [key: string]: INumObject } = {};
   const maxIds: INumObject = {};
 
-  // читаем файлы ORM, и коллекции, сохр-м в кэш
+  // read model files, store to cache
   for (let x = 0; x < modelNames.length; x++) {
     const name = modelNames[x];
     // ORM:
     const model = await readModel(name);
     models[name] = model;
-    // коллекции:
+    // collections:
     const collection = await readCollection(name);
     collections[name] = collection;
-    // индексы:
+    // indexes:
     const collectionIndexes: INumObject = {};
     for (let y = 0; y < collection.length; y++) {
       const item = collection[y];
       collectionIndexes[item.id] = y;
     }
     indexes[name] = collectionIndexes;
-    // максимумы id:
+    // max ids:
     const collectionMaxId = collection.length
       ? collection.map((item) => item.id).reduce((a, b) => (a > b ? a : b))
       : 0;
@@ -109,7 +109,7 @@ export async function storeToCollection(name: string): Promise<void> {
         for (let x = 0; x < keys.length; x++) {
           const key = keys[x];
           const fieldType = model[key];
-          if(!fieldType) {
+          if (!fieldType) {
             continue;
           }
           if (fieldType === "gallery") {
@@ -145,3 +145,5 @@ export async function writeStore() {
     console.log(error);
   }
 }
+
+export { aggregate, deleteOne, getAll, getOne, insert, queryParser, relate, unRelate, updateOne } from './src/queries'

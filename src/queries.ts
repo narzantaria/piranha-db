@@ -19,7 +19,7 @@ export function insert(model: string, values: IObject) {
   }
 }
 
-// только один элемент в массиве
+// Only one element in the array
 function xorArrays(arr1: any[], arr2: any[]): boolean {
   let count = 0;
   for (let i = 0; i < arr2.length; i++) {
@@ -30,7 +30,7 @@ function xorArrays(arr1: any[], arr2: any[]): boolean {
   return count === 1;
 }
 
-// все элементы в объекте
+// All elements in the object
 function checkElementsInObject(obj: any, arr: any[]): boolean {
   const flatObject = JSON.stringify(obj).toLowerCase();
   return arr.every((element) =>
@@ -38,16 +38,16 @@ function checkElementsInObject(obj: any, arr: any[]): boolean {
   );
 }
 
-// хотя бы один элемент в объекте
+// at least one element in the object
 function isElementInObject(obj: IObject, arr: any[]): boolean {
   let result = false;
   for (const key in obj) {
     if (obj.hasOwnProperty(key)) {
       if (typeof obj[key] === "object") {
-        result = isElementInObject(obj[key], arr); // Рекурсивно проверяем вложенные объекты
+        result = isElementInObject(obj[key], arr); // Recursively check the nested objects
       } else {
         if (arr.includes(obj[key])) {
-          // Проверяем значение поля на совпадение с элементом массива
+          // Check the field value equals to the element of the array
           result = true;
           break;
         }
@@ -83,26 +83,22 @@ const isOnlyElementInObject = (obj: IObject, arr: any[]): boolean => {
 };
 
 /**
- * Принимает аргументы:
+ * Used to filter the data in the Getall function.
+ * Arguments:
  * 1. param - та самая абракадабра, значение поля запроса.
- * 2. value - значение того же поля записи.
- * 3. key - поле.
+ * 2. value - The value of the same field in the document.
+ * 3. key - operator.
  **/
 function parseParam2(params: IObject, value: any): boolean {
   const operators = Object.keys(params);
   for (let x = 0; x < operators.length; x++) {
     let inverse: boolean = false;
-    // let has: boolean = false;
     let operator = operators[x] as TOperator;
     const param = params[operator];
     if (operator.slice(0, 1) === "!") {
       inverse = true;
       operator = operator.slice(1, operator.length - 1) as TOperator;
     }
-    // if (operator.slice(-1) === "^") {
-    //   has = true;
-    //   operator = operator.slice(0, operator.length - 2) as TOperator;
-    // }
     let result = getResult(operator, param);
     result = inverse ? !result : result;
     if (!result) return false;
@@ -297,18 +293,15 @@ export function aggregate(aggr: IAggr) {
     }
   }
   try {
-    //
     return aggregator(aggr);
   } catch (error) {
     console.log(error);
   }
 }
 
-/**
- * Парсит параметры запроса и создает запрос со специальным синтаксисом.
- * Сейчас это предварительная версия. Не работает с моделью.
- * Распознает 2 вида. Упрощенный вариант.
- * На клиенте (не в админке) можно создавать запросы и собственные парсеры.
+/** 
+ * Reads req.body and creates a query with the "special syntax".
+ * Simplified version, works only with 2 data types. In progress...
  **/
 export function queryParser(arg: IObject): IObject[] {
   const keys = Object.keys(arg);

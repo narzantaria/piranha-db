@@ -1,5 +1,5 @@
 /**
- * шифрование методом "одноразовый блокнот"
+ * encryption using "one-time notebook" method
  **/
 
 export function oneTimePadEncrypt(plainText: string, key: string): string {
