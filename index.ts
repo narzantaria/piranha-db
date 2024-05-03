@@ -2,29 +2,31 @@ import { store } from "./src/store";
 import { DATA_DIR, ORM_DIR } from "./src/dirs";
 import { read, readdir, write } from "./src/promises";
 import { IObject, INumObject } from "./src/types";
+import { parseField, splitField } from "./src/methods";
 
 // parse array of lines to object
 function parseArrayToObject(arr: string[]): IObject {
   const obj: IObject = {};
   arr.forEach((item) => {
-    const [key, value] = item.split(": "); // need to fix!
+    const [key, value] = splitField(item, ": "); // need to fix!
     obj[key] = value.slice(0, 1) === "!" ? value.slice(1, value.length) : value;
   });
   return obj;
 }
 
 /**
- * Parses gallery and other fields
+ * Parses fields (single, array, object)
  **/
 function parseObjectFields(obj: IObject, model: IObject) {
   const keys = Object.keys(obj);
   for (let x = 0; x < keys.length; x++) {
     const key = keys[x];
-    const fieldType = model[key];
-    if (!fieldType) {
+    const field = model[key];
+    if (!field) {
       continue;
     }
-    if (fieldType === "gallery") {
+    const fieldResult = parseField(field)
+    if (fieldResult.type !== "single") {
       obj[key] = JSON.parse(obj[key]);
     }
   }
@@ -99,6 +101,7 @@ export async function bootstrap() {
   store.set("indexes", indexes);
 }
 
+// save data to disk
 export async function storeToCollection(name: string): Promise<void> {
   try {
     const model: IObject = store.get('models')[name];
@@ -108,11 +111,13 @@ export async function storeToCollection(name: string): Promise<void> {
       .map((item: IObject) => {
         for (let x = 0; x < keys.length; x++) {
           const key = keys[x];
-          const fieldType = model[key];
-          if (!fieldType) {
+          const field = model[key];
+          if (!field) {
             continue;
           }
-          if (fieldType === "gallery") {
+          const fieldResult = parseField(field)
+
+          if (fieldResult.type !== "single") {
             item[key] = JSON.stringify(item[key]);
           }
         }

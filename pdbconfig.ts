@@ -1,5 +1,6 @@
 export const pdbconfig = {
   "modelsFolder": "orm",
   "dataFolder": "db",
-  "simpleParser": true
+  "simpleParser": true,
+  "itemSeparator": "----------"
 }
