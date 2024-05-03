@@ -1,11 +1,10 @@
 {
   "name": "piranha-db",
-  "version": "1.0.3",
-  "main": "index.js",
+  "version": "1.0.4",
+  "main": "dist/index.js",
   "repository": "https://github.com/narzantaria/piranha-db.git",
   "author": "Nar Zantaria <narzantaria@gmail.com>",
   "license": "MIT",
-  "type": "module",
   "scripts": {
     "build": "tsc",
     "lint": "npx eslint . --ext .js,.ts --fix",
