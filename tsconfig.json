@@ -8,10 +8,10 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "moduleResolution": "node",
-    "outDir": "output",
+    "outDir": "dist",
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "strictPropertyInitialization": false
   },
-  "exclude": ["node_modules", "output"]
+  "exclude": ["node_modules", "dist", "media", "temp"]
 }
