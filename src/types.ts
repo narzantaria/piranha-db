@@ -20,3 +20,9 @@ export type TOperator =
   | "o||"
   | "o&&"
   | "o<>";
+
+  export interface IRelation {
+    model: string;
+    operator: string;
+    level: "host" | "recipient" | "bi";
+  }

@@ -1,22 +1,38 @@
+import { processField, processRelation, removeRelations } from "./methods";
 import { store } from "./store";
 import { IObject, TOperator } from "./types";
 
 // CREATE
-export function insert(model: string, values: IObject) {
+export function insert(name: string, values: IObject) {
+  console.log(values);
   try {
-    const newData = store.get("collections");
-    const maxIds = store.get("maxIds");
-    let maxId = maxIds[model];
-    ++maxId;
-    maxIds[model] = maxId;
-    store.set("maxIds", maxIds);
+    const collection = store.get("collections");
+    const maxId = setMaxId(name, 1);
     const newValues = { ...values, id: maxId };
-    newData[model].push(newValues);
-    store.set("collections", newData);
+    collection[name].push(newValues);
+    store.set("collections", collection);
     return newValues;
   } catch (error) {
     console.log(error);
   }
+}
+
+// name: model(collection) name, arg: creation
+function setMaxId(name: string, arg?: number): number {
+  const collection: IObject[] = store.get("collections")[name];
+  const maxIds = store.get("maxIds");
+  let maxId = maxIds[name];
+  const currentId = collection.length ? collection.map(x => x.id).reduce((a, b) => a > b ? a : b) : 0;
+
+  if (maxId > currentId) {
+    maxId = currentId;
+  } else if (arg) {
+    ++maxId;
+  }
+
+  maxIds[name] = maxId;
+  store.set("maxIds", maxIds);
+  return maxId;
 }
 
 // Only one element in the array
@@ -85,11 +101,11 @@ const isOnlyElementInObject = (obj: IObject, arr: any[]): boolean => {
 /**
  * Used to filter the data in the Getall function.
  * Arguments:
- * 1. param - та самая абракадабра, значение поля запроса.
+ * 1. param - field value.
  * 2. value - The value of the same field in the document.
  * 3. key - operator.
  **/
-function parseParam2(params: IObject, value: any): boolean {
+function convertParam(params: IObject, value: any): boolean {
   const operators = Object.keys(params);
   for (let x = 0; x < operators.length; x++) {
     let inverse: boolean = false;
@@ -150,7 +166,7 @@ export function getAll(
           const key = keys[y];
           const params = paramsObj[key];
           const value = x[key];
-          if (!parseParam2(params, value)) {
+          if (!convertParam(params, value)) {
             return false;
           }
         }
@@ -169,6 +185,7 @@ class IJoin {
 }
 
 // READ BY ID, join
+/*
 export function getOne(model: string, id: string, joins?: IJoin[]) {
   try {
     const data = store
@@ -179,6 +196,88 @@ export function getOne(model: string, id: string, joins?: IJoin[]) {
         const newJoin = joins[x];
         const joinData = getAll(newJoin.model, newJoin.params);
         data[newJoin.model] = joinData;
+      }
+    }
+    return data;
+  } catch (error) {
+    console.log(error);
+  }
+}
+*/
+
+// Just find by id
+function findById(name: string, id: string): IObject | undefined {
+  return store.get("collections")[name].filter((x: IObject) => x.id == id)[0];
+}
+
+export function getOne(name: string, id: string): IObject | undefined {
+  try {
+    let data = findById(name, id);
+    if (!data) {
+      return;
+    }
+
+    const model = store.get("models")[name];
+    const relationKeys = Object.keys(model).filter(
+      (x) => model[x].split(" ").length > 1,
+    );
+
+    // Joins
+    if (relationKeys) {
+      for (let x = 0; x < relationKeys.length; x++) {
+        const key = relationKeys[x];
+        const rvalue = model[key];
+        const relation = processRelation(rvalue);
+        if (!relation) {
+          continue;
+        }
+        switch (relation.operator) {
+          case "<>":
+            data[key] = store
+              .get("collections")
+            [relation.model].filter((y: IObject) => y.id == id)[0];
+            break;
+
+          case "<>>":
+            if (relation.level === "host") {
+              data[key] = store
+                .get("collections")
+              [relation.model].filter((y: IObject) => y[name] == id);
+            }
+            break;
+
+          case "<<>>":
+            if (relation.level === "host") {
+              const relCollection =
+                store.get("collections")[`${name}_${relation.model}`];
+              if (!relCollection) break;
+              data[key] = relCollection.filter((y: IObject) => y[name] === id).map((y: IObject) => {
+                return store
+                  .get("collections")
+                [relation.model].filter((z: IObject) => z.id == y[relation.model])[0];
+              })
+            }
+            break;
+
+          case "<<|>>":
+            const relCollection = store.get("collections")[`${name}_${relation.model}`] || store.get("collections")[`${relation.model}_${name}`];
+            if (!relCollection) {
+              break;
+            }
+            const qwerty = relCollection.filter((y: IObject) => y[name] === id).map((y: IObject) => {
+              return store
+                .get("collections")
+              [relation.model].filter((z: IObject) => z.id == y[relation.model])
+                .map((z: IObject) => removeRelations(name, z))
+              [0];
+            })
+
+            data[key] = JSON.parse(JSON.stringify(qwerty))
+            break;
+
+          default:
+            break;
+        }
       }
     }
     return data;
@@ -208,14 +307,66 @@ export function updateOne(model: string, values: IObject, id: string) {
 }
 
 // DELETE
-export function deleteOne(model: string, id: string) {
+export function deleteOne(name: string, id: string) {
   try {
-    const collections = store.get("collections");
-    const newData: IObject[] = collections[model];
-    collections[model] = newData.filter((x) => x.id != id);
+    let collections = store.get("collections");
+    const newData: IObject[] = collections[name];
+    collections[name] = newData.filter((x) => x.id != id);
+    cascade(name, id);
     store.set("collections", collections);
+    setMaxId(name);
   } catch (error) {
     console.log(error);
+  }
+}
+
+// delete related items
+function cascade(name: string, id: string) {
+  const collections = store.get('collections')
+  const model: IObject = store.get("models")[name]
+  const keys = Object.keys(model);
+  const data: IObject = collections[name].filter((x: IObject) => x.id == id)[0]
+  for (let x = 0; x < keys.length; x++) {
+    const key = keys[x];
+    const field = processField(model[key])
+    const relation = processRelation(model[key])
+    if (field?.type === "relation" && relation) {
+      const rname = relation.model;
+      const operator = relation.operator
+      const level = relation.level;
+      switch (operator) {
+        case "<>":
+          deleteOne(rname, data[rname].id);
+          break;
+
+        case "<>>":
+          if (level === "host") {
+            const relatedItems = data[rname]
+            for (let y = 0; y < relatedItems.length; y++) {
+              const item = relatedItems[y];
+              deleteOne(rname, item.id);
+            }
+          }
+          break;
+
+        case "<<>>":
+        case "<<|>>":
+          const relatedItems = data[rname]
+          const relCollectionName = collections[`${name}_${rname}`] ? `${name}_${rname}` : `${rname}_${name}`;
+          let relCollection: IObject[] = collections[relCollectionName]
+          for (let y = 0; y < relatedItems.length; y++) {
+            const item = relatedItems[y];
+            deleteOne(rname, item.id);
+          }
+          relCollection = relCollection.filter((x: IObject) => x[name] != name && x[rname] != rname);
+          collections[relCollectionName] = relCollection;
+          break;
+
+        default:
+          break;
+      }
+      store.set("collections", collections)
+    }
   }
 }
 
@@ -227,13 +378,17 @@ export function relate(
   rid: string,
 ) {
   try {
-    const relation = { [host]: hid, [recipient]: rid };
+    const name = `${host}_${recipient}`;
     const collections = store.get("collections");
-    const data: IObject[] = collections[`${host}_${recipient}`];
-    if (!data) {
-      collections[`${host}_${recipient}`] = [relation];
+    const collection: IObject[] = collections[name];
+
+    const maxId = setMaxId(name, 1);
+
+    const relation = { id: maxId, [host]: hid, [recipient]: rid };
+    if (!collection) {
+      collections[name] = [relation];
     } else {
-      collections[`${host}_${recipient}`].push(relation);
+      collections[name].push(relation);
     }
     store.set("collections", collections);
   } catch (error) {
@@ -250,7 +405,8 @@ export function unRelate(
 ) {
   try {
     const collections = store.get("collections");
-    let data: IObject[] = collections[`${host}_${recipient}`];
+    const rname = `${host}_${recipient}`
+    let data: IObject[] = collections[rname];
     data = data.filter((x) => {
       if (x[host] === hid && x[recipient] === rid) {
         return false;
@@ -258,8 +414,9 @@ export function unRelate(
         return true;
       }
     });
-    collections[`${host}_${recipient}`] = data;
+    collections[rname] = data;
     store.set("collections", collections);
+    setMaxId(rname);
   } catch (error) {
     console.log(error);
   }
@@ -299,7 +456,7 @@ export function aggregate(aggr: IAggr) {
   }
 }
 
-/** 
+/**
  * Reads req.body and creates a query with the "special syntax".
  * Simplified version, works only with 2 data types. In progress...
  **/

@@ -1,19 +1,17 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.queryParser = exports.aggregate = exports.unRelate = exports.relate = exports.deleteOne = exports.updateOne = exports.getOne = exports.getAll = exports.insert = void 0;
+const methods_1 = require("./methods");
 const store_1 = require("./store");
 // CREATE
-function insert(model, values) {
+function insert(name, values) {
+    console.log(values);
     try {
-        const newData = store_1.store.get("collections");
-        const maxIds = store_1.store.get("maxIds");
-        let maxId = maxIds[model];
-        ++maxId;
-        maxIds[model] = maxId;
-        store_1.store.set("maxIds", maxIds);
+        const collection = store_1.store.get("collections");
+        const maxId = setMaxId(name, 1);
         const newValues = { ...values, id: maxId };
-        newData[model].push(newValues);
-        store_1.store.set("collections", newData);
+        collection[name].push(newValues);
+        store_1.store.set("collections", collection);
         return newValues;
     }
     catch (error) {
@@ -21,6 +19,22 @@ function insert(model, values) {
     }
 }
 exports.insert = insert;
+// name: model(collection) name, arg: creation
+function setMaxId(name, arg) {
+    const collection = store_1.store.get("collections")[name];
+    const maxIds = store_1.store.get("maxIds");
+    let maxId = maxIds[name];
+    const currentId = collection.length ? collection.map(x => x.id).reduce((a, b) => a > b ? a : b) : 0;
+    if (maxId > currentId) {
+        maxId = currentId;
+    }
+    else if (arg) {
+        ++maxId;
+    }
+    maxIds[name] = maxId;
+    store_1.store.set("maxIds", maxIds);
+    return maxId;
+}
 // Only one element in the array
 function xorArrays(arr1, arr2) {
     let count = 0;
@@ -83,11 +97,11 @@ const isOnlyElementInObject = (obj, arr) => {
 /**
  * Used to filter the data in the Getall function.
  * Arguments:
- * 1. param - та самая абракадабра, значение поля запроса.
+ * 1. param - field value.
  * 2. value - The value of the same field in the document.
  * 3. key - operator.
  **/
-function parseParam2(params, value) {
+function convertParam(params, value) {
     const operators = Object.keys(params);
     for (let x = 0; x < operators.length; x++) {
         let inverse = false;
@@ -143,7 +157,7 @@ function getAll(modelName, paramsObj, offset, limit) {
                     const key = keys[y];
                     const params = paramsObj[key];
                     const value = x[key];
-                    if (!parseParam2(params, value)) {
+                    if (!convertParam(params, value)) {
                         return false;
                     }
                 }
@@ -160,15 +174,83 @@ exports.getAll = getAll;
 class IJoin {
 }
 // READ BY ID, join
-function getOne(model, id, joins) {
+/*
+export function getOne(model: string, id: string, joins?: IJoin[]) {
+  try {
+    const data = store
+      .get("collections")
+      [model].filter((x: IObject) => x.id == id)[0];
+    if (joins) {
+      for (let x = 0; x < joins.length; x++) {
+        const newJoin = joins[x];
+        const joinData = getAll(newJoin.model, newJoin.params);
+        data[newJoin.model] = joinData;
+      }
+    }
+    return data;
+  } catch (error) {
+    console.log(error);
+  }
+}
+*/
+// Just find by id
+function findById(name, id) {
+    return store_1.store.get("collections")[name].filter((x) => x.id == id)[0];
+}
+function getOne(name, id) {
     try {
-        const data = store_1.store
-            .get("collections")[model].filter((x) => x.id == id)[0];
-        if (joins) {
-            for (let x = 0; x < joins.length; x++) {
-                const newJoin = joins[x];
-                const joinData = getAll(newJoin.model, newJoin.params);
-                data[newJoin.model] = joinData;
+        let data = findById(name, id);
+        if (!data) {
+            return;
+        }
+        const model = store_1.store.get("models")[name];
+        const relationKeys = Object.keys(model).filter((x) => model[x].split(" ").length > 1);
+        // Joins
+        if (relationKeys) {
+            for (let x = 0; x < relationKeys.length; x++) {
+                const key = relationKeys[x];
+                const rvalue = model[key];
+                const relation = (0, methods_1.processRelation)(rvalue);
+                if (!relation) {
+                    continue;
+                }
+                switch (relation.operator) {
+                    case "<>":
+                        data[key] = store_1.store
+                            .get("collections")[relation.model].filter((y) => y.id == id)[0];
+                        break;
+                    case "<>>":
+                        if (relation.level === "host") {
+                            data[key] = store_1.store
+                                .get("collections")[relation.model].filter((y) => y[name] == id);
+                        }
+                        break;
+                    case "<<>>":
+                        if (relation.level === "host") {
+                            const relCollection = store_1.store.get("collections")[`${name}_${relation.model}`];
+                            if (!relCollection)
+                                break;
+                            data[key] = relCollection.filter((y) => y[name] === id).map((y) => {
+                                return store_1.store
+                                    .get("collections")[relation.model].filter((z) => z.id == y[relation.model])[0];
+                            });
+                        }
+                        break;
+                    case "<<|>>":
+                        const relCollection = store_1.store.get("collections")[`${name}_${relation.model}`] || store_1.store.get("collections")[`${relation.model}_${name}`];
+                        if (!relCollection) {
+                            break;
+                        }
+                        const qwerty = relCollection.filter((y) => y[name] === id).map((y) => {
+                            return store_1.store
+                                .get("collections")[relation.model].filter((z) => z.id == y[relation.model])
+                                .map((z) => (0, methods_1.removeRelations)(name, z))[0];
+                        });
+                        data[key] = JSON.parse(JSON.stringify(qwerty));
+                        break;
+                    default:
+                        break;
+                }
             }
         }
         return data;
@@ -199,29 +281,79 @@ function updateOne(model, values, id) {
 }
 exports.updateOne = updateOne;
 // DELETE
-function deleteOne(model, id) {
+function deleteOne(name, id) {
     try {
-        const collections = store_1.store.get("collections");
-        const newData = collections[model];
-        collections[model] = newData.filter((x) => x.id != id);
+        let collections = store_1.store.get("collections");
+        const newData = collections[name];
+        collections[name] = newData.filter((x) => x.id != id);
+        cascade(name, id);
         store_1.store.set("collections", collections);
+        setMaxId(name);
     }
     catch (error) {
         console.log(error);
     }
 }
 exports.deleteOne = deleteOne;
+// delete related items
+function cascade(name, id) {
+    const collections = store_1.store.get('collections');
+    const model = store_1.store.get("models")[name];
+    const keys = Object.keys(model);
+    const data = collections[name].filter((x) => x.id == id)[0];
+    for (let x = 0; x < keys.length; x++) {
+        const key = keys[x];
+        const field = (0, methods_1.processField)(model[key]);
+        const relation = (0, methods_1.processRelation)(model[key]);
+        if (field?.type === "relation" && relation) {
+            const rname = relation.model;
+            const operator = relation.operator;
+            const level = relation.level;
+            switch (operator) {
+                case "<>":
+                    deleteOne(rname, data[rname].id);
+                    break;
+                case "<>>":
+                    if (level === "host") {
+                        const relatedItems = data[rname];
+                        for (let y = 0; y < relatedItems.length; y++) {
+                            const item = relatedItems[y];
+                            deleteOne(rname, item.id);
+                        }
+                    }
+                    break;
+                case "<<>>":
+                case "<<|>>":
+                    const relatedItems = data[rname];
+                    const relCollectionName = collections[`${name}_${rname}`] ? `${name}_${rname}` : `${rname}_${name}`;
+                    let relCollection = collections[relCollectionName];
+                    for (let y = 0; y < relatedItems.length; y++) {
+                        const item = relatedItems[y];
+                        deleteOne(rname, item.id);
+                    }
+                    relCollection = relCollection.filter((x) => x[name] != name && x[rname] != rname);
+                    collections[relCollectionName] = relCollection;
+                    break;
+                default:
+                    break;
+            }
+            store_1.store.set("collections", collections);
+        }
+    }
+}
 // RELATE
 function relate(host, recipient, hid, rid) {
     try {
-        const relation = { [host]: hid, [recipient]: rid };
+        const name = `${host}_${recipient}`;
         const collections = store_1.store.get("collections");
-        const data = collections[`${host}_${recipient}`];
-        if (!data) {
-            collections[`${host}_${recipient}`] = [relation];
+        const collection = collections[name];
+        const maxId = setMaxId(name, 1);
+        const relation = { id: maxId, [host]: hid, [recipient]: rid };
+        if (!collection) {
+            collections[name] = [relation];
         }
         else {
-            collections[`${host}_${recipient}`].push(relation);
+            collections[name].push(relation);
         }
         store_1.store.set("collections", collections);
     }
@@ -234,7 +366,8 @@ exports.relate = relate;
 function unRelate(host, recipient, hid, rid) {
     try {
         const collections = store_1.store.get("collections");
-        let data = collections[`${host}_${recipient}`];
+        const rname = `${host}_${recipient}`;
+        let data = collections[rname];
         data = data.filter((x) => {
             if (x[host] === hid && x[recipient] === rid) {
                 return false;
@@ -243,8 +376,9 @@ function unRelate(host, recipient, hid, rid) {
                 return true;
             }
         });
-        collections[`${host}_${recipient}`] = data;
+        collections[rname] = data;
         store_1.store.set("collections", collections);
+        setMaxId(rname);
     }
     catch (error) {
         console.log(error);
