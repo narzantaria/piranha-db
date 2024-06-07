@@ -1,11 +1,19 @@
 import { store } from "./src/store";
-import { DATA_DIR, ORM_DIR } from "./src/dirs";
-import { read, readdir, write } from "./src/promises";
+import { DATA_DIR, MODELS_DIR, QUERIES_DIR } from "./src/dirs";
+import { access, mkdir, read, readdir, unlink, write } from "./src/promises";
 import { IObject, INumObject } from "./src/types";
-import { processField, processRelation, removeField, splitField } from "./src/methods";
+import {
+  parseField,
+  processRelation,
+  removeField,
+  splitField,
+} from "./src/methods";
+import { dbconfig } from "./dbconfig";
+
+const { itemSeparator, magicKey } = dbconfig;
 
 // parse array of lines to object
-function arrayToObject(arr: string[]): IObject {
+function parseArrayToObject(arr: string[]): IObject {
   const obj: IObject = {};
   arr.forEach((item) => {
     const [key, value] = splitField(item, ": "); // need to fix!
@@ -14,7 +22,9 @@ function arrayToObject(arr: string[]): IObject {
   return obj;
 }
 
-// JSON.parse object fields
+/**
+ * Parses fields (single, array, object)
+ **/
 function parseObjectFields(obj: IObject, model: IObject) {
   const keys = Object.keys(obj);
   for (let x = 0; x < keys.length; x++) {
@@ -23,7 +33,7 @@ function parseObjectFields(obj: IObject, model: IObject) {
     if (!field) {
       continue;
     }
-    const fieldResult = processField(field);
+    const fieldResult = parseField(field);
     if (!fieldResult) {
       continue;
     }
@@ -38,8 +48,8 @@ function parseObjectFields(obj: IObject, model: IObject) {
  * Read model (ORM), return IObject
  **/
 async function readModel(name: string): Promise<IObject> {
-  const modelProxy = await read(`${ORM_DIR}/${name}.pxx`, "utf8");
-  return arrayToObject(
+  const modelProxy = await read(`${MODELS_DIR}/${name}.mod`, "utf8");
+  return parseArrayToObject(
     modelProxy
       .split("\n")
       .filter((x, i) => i > 0)
@@ -47,23 +57,25 @@ async function readModel(name: string): Promise<IObject> {
   );
 }
 
+// read collection from db
 async function readCollection(
   name: string,
   model?: IObject,
 ): Promise<IObject[]> {
   try {
     const dataProxy = await read(`${DATA_DIR}/${name}.dta`, "utf8");
-    const qwerty = dataProxy.split("----------").map((item) => {
+    const qwerty = dataProxy.split(itemSeparator).map((item) => {
       return item
+        .replaceAll(magicKey, itemSeparator) // ??????????????????????
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line !== "");
     });
     return qwerty.map((x) => {
       if (model) {
-        return parseObjectFields(arrayToObject(x), model);
+        return parseObjectFields(parseArrayToObject(x), model);
       } else {
-        return arrayToObject(x);
+        return parseArrayToObject(x);
       }
     });
   } catch (error) {
@@ -71,9 +83,101 @@ async function readCollection(
   }
 }
 
+// update collection after build new models
+export async function updateCollectionsAfterBuild(names: string[]): Promise<void> {
+  try {
+    const collections = store.get("collections");
+    const models = store.get("models");
+    const maxIds = store.get("maxIds");
+    const indexes = store.get("indexes");
+
+    for (let x = 0; x < names.length; x++) {
+      const name = names[x];
+      // ORM:
+      const model = await readModel(name);
+      models[name] = model;
+      // collections:
+      collections[name] = [];
+      // indexes:
+      const collectionIndexes: INumObject = {};
+      indexes[name] = collectionIndexes;
+      // max ids
+      maxIds[name] = 0;
+    }
+    store.set("collections", collections);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+// clear one collection (danger!)
+export function clearOneCollection(name: string) {
+  try {
+    let models = store.get("models");
+    let collections = store.get("collections");
+    let maxIds = store.get("maxIds");
+    let indexes = store.get("indexes");
+    models = removeField(models, name);
+    collections = removeField(collections, name);
+    maxIds = removeField(maxIds, name);
+    indexes = removeField(indexes, name);
+    store.set("models", {});
+    store.set("collections", {});
+    store.set("maxIds", {});
+    store.set("indexes", {});
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+// clear all collections (danger!)
+export function clearCollections() {
+  try {
+    let collections = store.get("collections");
+    const keys = Object.keys(collections);
+    for (let x = 0; x < keys.length; x++) {
+      const key = keys[x];
+      collections[key] = [];
+    }
+    store.set("models", {});
+    store.set("collections", collections);
+    store.set("maxIds", {});
+    store.set("indexes", {});
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+// check if directory exists
+async function checkFolderExists(dir: string): Promise<boolean> {
+  try {
+    await access(dir);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// create directory if not exist
+async function mkDirNotExists(arg: string): Promise<void> {
+  try {
+    const exists = await checkFolderExists(arg);
+    if (!exists) {
+      await mkdir(arg);
+    }
+  } catch (error) {
+    console.log(error);
+  }
+}
+
 export async function bootstrap() {
+  // create directories if not exist
+  await mkDirNotExists(MODELS_DIR);
+  await mkDirNotExists(QUERIES_DIR);
+  await mkDirNotExists(DATA_DIR);
+
   // model names
-  const modelFiles = await readdir(ORM_DIR);
+  const modelFiles = await readdir(MODELS_DIR);
   const modelNames = modelFiles.map((x) => x.replace(/\.[^/.]+$/, ""));
 
   // Relational collections
@@ -139,48 +243,55 @@ export async function storeToCollection(name: string): Promise<void> {
   try {
     const collection = store.get("collections")[name];
     const model: IObject = store.get("models")[name];
+    if (!collection || !collection?.length) {
+      return;
+    }
     const data = collection
-      .map((item: IObject) => {
+      .map((obj: IObject) => {
+        let objProxy = { ...obj };
         if (model) {
           for (let x = 0; x < Object.keys(model).length; x++) {
             const key = Object.keys(model)[x];
-            const field = model[key];
+            const field = model[key]; // +++
             if (!field) {
               continue;
             }
-            const fieldResult = processField(field);
+            const fieldResult = parseField(field);
             if (!fieldResult) {
               continue;
             }
-
             if (fieldResult.type === "array" || fieldResult.type === "object") {
-              item[key] = JSON.stringify(item[key]);
+              objProxy[key] = JSON.stringify(objProxy[key]);
             }
             if (fieldResult.type === "relation") {
-              //
               const relation = processRelation(field);
-              if(!relation) {
+              if (!relation) {
                 continue;
               }
               const operator = relation.operator;
               const level = relation.level;
-              if(
-                (operator === "<>") ||
+              if (
+                operator === "<>" ||
                 (operator === "<>>" && level === "recipient")
               ) {
                 continue;
               }
-              item = removeField(item, key);
+              objProxy = removeField(objProxy, key);
             }
           }
         }
-        return Object.keys({ id: item.id, ...item })
-          .map((itemKey) => {
-            return `${itemKey}: ${item[itemKey]}`;
+        return Object.keys({ id: objProxy.id, ...objProxy })
+          .map((objKey) => {
+            let itemRow = `${objKey}: ${objProxy[objKey]}`
+            // convert separator
+            if (model) {
+              itemRow = itemRow.replaceAll(itemSeparator, magicKey);
+            }
+            return itemRow;
           })
           .join("\n");
       })
-      .join("\n----------\n");
+      .join(`\n${itemSeparator}\n`);
     await write(`${DATA_DIR}/${name}.dta`, data);
   } catch (error) {
     console.log(error);
@@ -189,11 +300,17 @@ export async function storeToCollection(name: string): Promise<void> {
 
 export async function writeStore() {
   try {
-    const collections = store.get("collections");
+    const collections = store.get("collections") as IObject;
     const keys = Object.keys(collections);
     for (let x = 0; x < keys.length; x++) {
       const key = keys[x];
       if (!collections[key].length) {
+        // if the collection is empty the data will be deleted
+        try {
+          await unlink(`${DATA_DIR}/${key}.dta`);
+        } catch (error) {
+          console.log(`No '${key}' collection`);
+        }
         continue;
       }
       await storeToCollection(key);
@@ -204,4 +321,4 @@ export async function writeStore() {
   }
 }
 
-export { aggregate, deleteOne, getAll, getOne, insert, queryParser, relate, unRelate, updateOne } from './src/queries'
+export { aggregate, checkCollectionExists, checkModelExists, deleteOne, getAll, getOne, insert, queryParser, relate, unRelate, updateOne } from './src/queries'

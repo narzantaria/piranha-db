@@ -1,6 +1,7 @@
-import { pdbconfig } from "../pdbconfig";
+import { dbconfig } from "../dbconfig";
 
-const { dataFolder, modelsFolder } = pdbconfig;
+const { dataFolder, modelsFolder, queriesFolder } = dbconfig;
 
-export const ORM_DIR = `${process.cwd()}/${modelsFolder}`;
+export const MODELS_DIR = `${process.cwd()}/${modelsFolder}`;
 export const DATA_DIR = `${process.cwd()}/${dataFolder}`;
+export const QUERIES_DIR = `${process.cwd()}/${queriesFolder}`;

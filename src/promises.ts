@@ -1,4 +1,4 @@
-import fs, { promises } from "fs";
+import fs from "fs";
 import fse from "fs-extra";
 import util from "util";
 import ChildProcess from "child_process";

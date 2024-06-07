@@ -30,8 +30,8 @@ export interface IFfieldInfo {
 }
 
 // Detect field type, - single, array, object, relation
-export function processField(arg: string): IFfieldInfo | void {
-  if(!arg) {
+export function parseField(arg: string): IFfieldInfo | void {
+  if (!arg) {
     return;
   }
   try {
@@ -58,7 +58,7 @@ export function processField(arg: string): IFfieldInfo | void {
       };
     }
   } catch (error) {
-    console.log(`processField error: ${error}`);
+    console.log(`parseField error: ${error}`);
     return;
   }
 }
@@ -112,10 +112,39 @@ export function removeRelations(modelName: string, obj: IObject): IObject {
   const keys = Object.keys(obj);
   for (let x = 0; x < keys.length; x++) {
     const key = keys[x];
-    const field = processField(model[key]);
-    if(field?.type === "relation") {
+    const field = parseField(model[key]);
+    if (field?.type === "relation") {
       obj = removeField(obj, key);
-    }    
+    }
   }
   return obj;
+}
+
+export function replaceInValues(
+  values: IObject,
+  source: string,
+  replace: string,
+): IObject {
+  const keys = Object.keys(values);
+  for (let x = 0; x < keys.length; x++) {
+    const key = keys[x];
+    values[key] = values[key].replaceAll(source, replace);
+  }
+  return values;
+}
+
+export function filterFields(data: IObject[], fields?: string[]): IObject[] {
+  if (!fields || fields.length === 0) {
+    return data;
+  } else {
+    return data.map(item => {
+      const newItem: IObject = {};
+      fields.forEach(field => {
+        if (item.hasOwnProperty(field)) {
+          newItem[field] = item[field];
+        }
+      });
+      return newItem;
+    });
+  }
 }

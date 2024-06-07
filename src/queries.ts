@@ -1,16 +1,43 @@
-import { processField, processRelation, removeRelations } from "./methods";
+import { MODELS_DIR } from "./dirs";
+import { filterFields, parseField, processRelation, removeRelations } from "./methods";
+import { access, lstat, stat } from "./promises";
 import { store } from "./store";
-import { IObject, TOperator } from "./types";
+import { IAggr, IObject, TOperator } from "./types";
+
+// check if the model file exists
+export async function checkModelExists(name: string): Promise<boolean> {
+  try {
+    await access(`${MODELS_DIR}/${name}.mod`);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// check if the collection exists or empty
+export function checkCollectionExists(name: string): boolean {
+  try {
+    return Boolean(store.get("collections")?.[name].length)
+  } catch (error) {
+    console.log(error);
+    return false;
+  }
+}
 
 // CREATE
-export function insert(name: string, values: IObject) {
-  console.log(values);
+/**
+ * Create a new entry in the `name` collection with `values` ​​data.
+ * @param {string} name - The collection name
+ * @param {IObject} values - New document values
+ * @returns {IObject} The values with the new id
+ */
+export function insert(name: string, values: IObject): IObject | undefined {
   try {
-    const collection = store.get("collections");
+    const collections = store.get("collections");
     const maxId = setMaxId(name, 1);
-    const newValues = { ...values, id: maxId };
-    collection[name].push(newValues);
-    store.set("collections", collection);
+    const newValues: IObject = { ...values, id: maxId };
+    collections[name].push(newValues);
+    store.set("collections", collections);
     return newValues;
   } catch (error) {
     console.log(error);
@@ -22,7 +49,9 @@ function setMaxId(name: string, arg?: number): number {
   const collection: IObject[] = store.get("collections")[name];
   const maxIds = store.get("maxIds");
   let maxId = maxIds[name];
-  const currentId = collection.length ? collection.map(x => x.id).reduce((a, b) => a > b ? a : b) : 0;
+  const currentId = collection.length
+    ? collection.map((x) => x.id).reduce((a, b) => (a > b ? a : b))
+    : 0;
 
   if (maxId > currentId) {
     maxId = currentId;
@@ -101,11 +130,11 @@ const isOnlyElementInObject = (obj: IObject, arr: any[]): boolean => {
 /**
  * Used to filter the data in the Getall function.
  * Arguments:
- * 1. param - field value.
+ * 1. param - та самая абракадабра, значение поля запроса.
  * 2. value - The value of the same field in the document.
  * 3. key - operator.
  **/
-function convertParam(params: IObject, value: any): boolean {
+function processParam(params: IObject, value: any): boolean {
   const operators = Object.keys(params);
   for (let x = 0; x < operators.length; x++) {
     let inverse: boolean = false;
@@ -131,6 +160,10 @@ function convertParam(params: IObject, value: any): boolean {
         return value < param;
       case "<=":
         return value <= param;
+      case "[]":
+        return value >= param[0] && value <= param[1];
+      case "()":
+        return value > param[0] && value < param[1];
       case "a&&":
         return JSON.parse(param).every((item: any) => value.includes(item));
       case "a||":
@@ -151,37 +184,45 @@ function convertParam(params: IObject, value: any): boolean {
 }
 
 // READ ALL
+/**
+ * Get all documents from the  `name` collection.
+ * @param {string} name - The collection name
+ * @param {IObject} params - The query parameters
+ * @param {number} offset - Offset, the number of records that will be skipped.
+ * @param {number} limit - The limit of querying records
+ * @param {string[]} fields - Fields that must be displayed. By default, all fields are displayed.
+ * @returns {IObject} The values with the new id
+ */
 export function getAll(
-  modelName: string,
-  paramsObj?: IObject,
+  name: string,
+  params?: IObject,
   offset?: number,
   limit?: number,
-) {
+  fields?: string[]
+): IObject[] | undefined {
   try {
-    let data: IObject[] = store.get("collections")[modelName];
-    if (paramsObj) {
+    let data: IObject[] = store.get("collections")[name];
+    if (params && Object.keys(params).length > 0) {
       data = data.filter((x) => {
-        const keys = Object.keys(paramsObj);
+        const keys = Object.keys(params);
         for (let y = 0; y < keys.length; y++) {
           const key = keys[y];
-          const params = paramsObj[key];
+          const param = params[key];
           const value = x[key];
-          if (!convertParam(params, value)) {
+          if (!processParam(param, value)) {
             return false;
           }
         }
         return true;
       });
     }
+    if (fields?.length) {
+      data = filterFields(data, fields);
+    }
     return data.slice(offset || 0, limit ? offset || 0 + limit : data.length);
   } catch (error) {
     console.log(error);
   }
-}
-
-class IJoin {
-  model: string;
-  params: IObject;
 }
 
 // READ BY ID, join
@@ -210,9 +251,16 @@ function findById(name: string, id: string): IObject | undefined {
   return store.get("collections")[name].filter((x: IObject) => x.id == id)[0];
 }
 
+/**
+ * Get one document from the `name` collection by `id`.
+ * @param {string} name - The collection name
+ * @param {string} id - The document id
+ * @returns {IObject} The document
+ */
 export function getOne(name: string, id: string): IObject | undefined {
   try {
-    let data = findById(name, id);
+    const sourceData = findById(name, id);
+    const data = { ...sourceData };
     if (!data) {
       return;
     }
@@ -235,7 +283,7 @@ export function getOne(name: string, id: string): IObject | undefined {
           case "<>":
             data[key] = store
               .get("collections")
-            [relation.model].filter((y: IObject) => y.id == id)[0];
+            [relation.model].filter((y: IObject) => y[name] == id);
             break;
 
           case "<>>":
@@ -251,28 +299,37 @@ export function getOne(name: string, id: string): IObject | undefined {
               const relCollection =
                 store.get("collections")[`${name}_${relation.model}`];
               if (!relCollection) break;
-              data[key] = relCollection.filter((y: IObject) => y[name] === id).map((y: IObject) => {
-                return store
-                  .get("collections")
-                [relation.model].filter((z: IObject) => z.id == y[relation.model])[0];
-              })
+              data[key] = relCollection
+                .filter((y: IObject) => y[name] === id)
+                .map((y: IObject) => {
+                  return store
+                    .get("collections")
+                  [
+                    relation.model
+                  ].filter((z: IObject) => z.id == y[relation.model])[0];
+                });
             }
             break;
 
           case "<<|>>":
-            const relCollection = store.get("collections")[`${name}_${relation.model}`] || store.get("collections")[`${relation.model}_${name}`];
+            const relCollection =
+              store.get("collections")[`${name}_${relation.model}`] ||
+              store.get("collections")[`${relation.model}_${name}`];
             if (!relCollection) {
               break;
             }
-            const qwerty = relCollection.filter((y: IObject) => y[name] === id).map((y: IObject) => {
-              return store
-                .get("collections")
-              [relation.model].filter((z: IObject) => z.id == y[relation.model])
-                .map((z: IObject) => removeRelations(name, z))
-              [0];
-            })
+            const qwerty = relCollection
+              .filter((y: IObject) => y[name] === id)
+              .map((y: IObject) => {
+                return store
+                  .get("collections")
+                [relation.model].filter(
+                  (z: IObject) => z.id == y[relation.model],
+                )
+                  .map((z: IObject) => removeRelations(name, z))[0];
+              });
 
-            data[key] = JSON.parse(JSON.stringify(qwerty))
+            data[key] = JSON.parse(JSON.stringify(qwerty));
             break;
 
           default:
@@ -287,10 +344,17 @@ export function getOne(name: string, id: string): IObject | undefined {
 }
 
 // UPDATE
-export function updateOne(model: string, values: IObject, id: string) {
+/**
+ * Find a document from the `name` collection by `id` and update.
+ * @param {string} name - The collection name
+ * @param {IObject} values - The document values to be updated
+ * @param {string} id - The document id
+ * @returns {IObject} The new document
+ */
+export function updateOne(name: string, values: IObject, id: string): IObject | undefined {
   try {
     const collections = store.get("collections");
-    const newData: IObject[] = collections[model];
+    const newData: IObject[] = collections[name];
 
     let filteredData = newData.filter((x) => x.id != id);
     filteredData = filteredData.concat([
@@ -299,17 +363,47 @@ export function updateOne(model: string, values: IObject, id: string) {
         ...values,
       },
     ]);
-    collections[model] = filteredData;
+    collections[name] = filteredData;
     store.set("collections", collections);
+    return filteredData[0];
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+function remove(name: string, id: string) {
+  try {
+    const collections = store.get("collections");
+    const newData: IObject[] = collections[name];
+    collections[name] = newData.filter((x) => x.id != id);
+    store.set("collections", collections);
+    setMaxId(name);
   } catch (error) {
     console.log(error);
   }
 }
 
 // DELETE
+/**
+ * Find a document from the `name` collection by `id` and delete.
+ * @param {string} name - The collection name
+ * @param {string} id - The document id
+ * @returns {void}
+ */
 export function deleteOne(name: string, id: string) {
   try {
-    let collections = store.get("collections");
+    remove(name, id);
+    cascade(name, id);
+  } catch (error) {
+    console.log(error);
+  }
+}
+
+/*
+// DELETE
+export function deleteOne(name: string, id: string) {
+  try {
+    const collections = store.get("collections");
     const newData: IObject[] = collections[name];
     collections[name] = newData.filter((x) => x.id != id);
     cascade(name, id);
@@ -319,58 +413,67 @@ export function deleteOne(name: string, id: string) {
     console.log(error);
   }
 }
+*/
 
 // delete related items
 function cascade(name: string, id: string) {
-  const collections = store.get('collections')
-  const model: IObject = store.get("models")[name]
+  const collections = store.get("collections");
+  const model: IObject = store.get("models")[name];
   const keys = Object.keys(model);
-  const data: IObject = collections[name].filter((x: IObject) => x.id == id)[0]
+  // это текущий документ, который удаляем:
   for (let x = 0; x < keys.length; x++) {
     const key = keys[x];
-    const field = processField(model[key])
-    const relation = processRelation(model[key])
+    const field = parseField(model[key]);
+    const relation = processRelation(model[key]);
     if (field?.type === "relation" && relation) {
       const rname = relation.model;
-      const operator = relation.operator
+      const operator = relation.operator;
       const level = relation.level;
       switch (operator) {
         case "<>":
-          deleteOne(rname, data[rname].id);
+          const relatedItem = collections[rname].filter((x: IObject) => x[name] == id)[0];
+          remove(rname, relatedItem.id);
           break;
 
         case "<>>":
           if (level === "host") {
-            const relatedItems = data[rname]
+            const relatedItems = collections[rname].filter((x: IObject) => x[name] == id);
             for (let y = 0; y < relatedItems.length; y++) {
               const item = relatedItems[y];
-              deleteOne(rname, item.id);
+              remove(rname, item.id);
             }
           }
           break;
 
-        case "<<>>":
+        case "<<>>":    // +++
         case "<<|>>":
-          const relatedItems = data[rname]
-          const relCollectionName = collections[`${name}_${rname}`] ? `${name}_${rname}` : `${rname}_${name}`;
-          let relCollection: IObject[] = collections[relCollectionName]
-          for (let y = 0; y < relatedItems.length; y++) {
-            const item = relatedItems[y];
-            deleteOne(rname, item.id);
-          }
-          relCollection = relCollection.filter((x: IObject) => x[name] != name && x[rname] != rname);
+          const relCollectionName = collections[`${name}_${rname}`]
+            ? `${name}_${rname}`
+            : `${rname}_${name}`;
+          let relCollection: IObject[] = collections[relCollectionName];
+          relCollection = relCollection.filter(
+            (x: IObject) => x[name] != id,
+          );
           collections[relCollectionName] = relCollection;
           break;
 
         default:
           break;
       }
-      store.set("collections", collections)
     }
   }
+  store.set("collections", collections);
 }
 
 // RELATE
+/**
+ * Relate two documents from `host` and `recipient` collections. Used only with "many-to-many" and "many-to-many-bi" relationships.
+ * @param {string} host - The parent (host) collection name
+ * @param {string} recipient - The child (recipient) collection name
+ * @param {string} hid - The parent (host) collection id
+ * @param {string} rid - The child (recipient) collection id
+ * @returns {void}
+ */
 export function relate(
   host: string,
   recipient: string,
@@ -397,6 +500,14 @@ export function relate(
 }
 
 // REMOVE RELATION
+/**
+ * "Un-relate" two documents from `host` and `recipient` collections. Used only with "many-to-many" and "many-to-many-bi" relationships.
+ * @param {string} host - The parent (host) collection name
+ * @param {string} recipient - The child (recipient) collection name
+ * @param {string} hid - The parent (host) collection id
+ * @param {string} rid - The child (recipient) collection id
+ * @returns {void}
+ */
 export function unRelate(
   host: string,
   recipient: string,
@@ -405,7 +516,7 @@ export function unRelate(
 ) {
   try {
     const collections = store.get("collections");
-    const rname = `${host}_${recipient}`
+    const rname = `${host}_${recipient}`;
     let data: IObject[] = collections[rname];
     data = data.filter((x) => {
       if (x[host] === hid && x[recipient] === rid) {
@@ -422,32 +533,27 @@ export function unRelate(
   }
 }
 
-class IAggr {
-  [key: string]: IJoin | IAggr | IAggr[];
-}
-
 // AGGREGATE
-export function aggregate(aggr: IAggr) {
-  function aggregator(arg: IAggr): any {
-    const isArray = Array.isArray(arg);
-    if (!isArray) {
-      const keys = Object.keys(arg);
-      for (let x = 0; x < keys.length; x++) {
-        const key = keys[x];
-        const value = arg[key];
-        if (value instanceof IJoin) {
-          return getAll(value.model, value.params);
-        } else if (value instanceof IAggr) {
-          if (Array.isArray(value)) {
-            return value.map((elem) => aggregator(elem));
-          } else {
-            return aggregator(value);
-          }
-        }
+/**
+ * Aggregation is a complex query from one or multiple collections.
+ * @param {IAggr[]} aggr - The parent (host) collection name
+ * @returns {IObject}
+ */
+export function aggregate(aggr: IAggr[]) {
+  function aggregator(arg: IAggr[]): IObject | undefined {
+    const result: IObject = {};
+    for (let x = 0; x < arg.length; x++) {
+      const element = arg[x];
+      const { data, fields, limit, model, name, offset, params } = element;
+      if (data && name) {
+        result[name] = aggregator(data)
+      } else if (model && params) {
+        result[model] = getAll(model, params, offset, limit, fields)
+      } else {
+        continue;
       }
-    } else {
-      return arg.map((x) => aggregator(x));
     }
+    return result
   }
   try {
     return aggregator(aggr);
