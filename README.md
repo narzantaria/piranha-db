@@ -3,10 +3,11 @@
 Flat-file system database that works in node.js environment. 
 
 **THE PROJECT NAME IS TEMPORARY.**
-
+<!--
 ### Why?
 
 ![why](media/why.png)
+-->
 
 The library was created for small and medium projects without the need to install special database management systems. At the same time, there are some signs of a relational database, including cascading deletion, own query syntax, aggregation, etc. **Piranha -DB** is not designed to replace a full-featured database management system - for this there is postgreSQL and other software. At this stage, the project is under testing. Next, we consider the main functions, after which it will be clear to you in which cases you will use it.
 
