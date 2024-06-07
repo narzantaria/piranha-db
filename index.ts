@@ -321,4 +321,5 @@ export async function writeStore() {
   }
 }
 
+export { store };
 export { aggregate, checkCollectionExists, checkModelExists, deleteOne, getAll, getOne, insert, queryParser, relate, unRelate, updateOne } from './src/queries'
