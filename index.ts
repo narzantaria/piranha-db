@@ -322,4 +322,5 @@ export async function writeStore() {
 }
 
 export { store };
+export { IAggr, ICollection, IJoin, INumObject, IObject, IQuery, IRelation, TOperator } from './src/types';
 export { aggregate, checkCollectionExists, checkModelExists, deleteOne, getAll, getOne, insert, queryParser, relate, unRelate, updateOne } from './src/queries'
