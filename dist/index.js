@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.updateOne = exports.unRelate = exports.relate = exports.queryParser = exports.insert = exports.getOne = exports.getAll = exports.deleteOne = exports.checkModelExists = exports.checkCollectionExists = exports.aggregate = exports.writeStore = exports.storeToCollection = exports.bootstrap = exports.clearCollections = exports.clearOneCollection = exports.updateCollectionsAfterBuild = void 0;
+exports.updateOne = exports.unRelate = exports.relate = exports.queryParser = exports.insert = exports.getOne = exports.getAll = exports.deleteOne = exports.checkModelExists = exports.checkCollectionExists = exports.aggregate = exports.IJoin = exports.store = exports.writeStore = exports.storeToCollection = exports.bootstrap = exports.clearCollections = exports.clearOneCollection = exports.updateCollectionsAfterBuild = void 0;
 const store_1 = require("./src/store");
+Object.defineProperty(exports, "store", { enumerable: true, get: function () { return store_1.store; } });
 const dirs_1 = require("./src/dirs");
 const promises_1 = require("./src/promises");
 const methods_1 = require("./src/methods");
@@ -307,6 +308,8 @@ async function writeStore() {
     }
 }
 exports.writeStore = writeStore;
+var types_1 = require("./src/types");
+Object.defineProperty(exports, "IJoin", { enumerable: true, get: function () { return types_1.IJoin; } });
 var queries_1 = require("./src/queries");
 Object.defineProperty(exports, "aggregate", { enumerable: true, get: function () { return queries_1.aggregate; } });
 Object.defineProperty(exports, "checkCollectionExists", { enumerable: true, get: function () { return queries_1.checkCollectionExists; } });
