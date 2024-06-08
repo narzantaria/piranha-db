@@ -5,7 +5,14 @@ const store_1 = require("./src/store");
 Object.defineProperty(exports, "store", { enumerable: true, get: function () { return store_1.store; } });
 const promiseman_1 = require("promiseman");
 const methods_1 = require("./src/methods");
-const file_handlers_1 = require("file-handlers");
+const DEFAULT_CONFIG = {
+    "modelsFolder": "models",
+    "dataFolder": "db",
+    "queriesFolder": "queries",
+    "itemSeparator": "----------",
+    "joins": true,
+    "magicKey": "12345"
+};
 // parse array of lines to object
 function parseArrayToObject(arr) {
     const obj = {};
@@ -40,8 +47,8 @@ function parseObjectFields(obj, model) {
  * Read model (ORM), return IObject
  **/
 async function readModel(name) {
-    const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
-    const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+    const dbconfig = store_1.store.get("dbconfig");
+    const MODELS_DIR = dbconfig.MODELS_DIR;
     const modelProxy = await (0, promiseman_1.read)(`${MODELS_DIR}/${name}.mod`, "utf8");
     return parseArrayToObject(modelProxy
         .split("\n")
@@ -51,10 +58,10 @@ async function readModel(name) {
 // read collection from db
 async function readCollection(name, model) {
     try {
-        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
-        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-        const magicKey = dbconfig?.magicKey || '12345';
-        const itemSeparator = dbconfig?.itemSeparator || "----------";
+        const dbconfig = store_1.store.get("dbconfig");
+        const DATA_DIR = dbconfig.DATA_DIR;
+        const magicKey = dbconfig.magicKey;
+        const itemSeparator = dbconfig.itemSeparator;
         const dataProxy = await (0, promiseman_1.read)(`${DATA_DIR}/${name}.dta`, "utf8");
         const qwerty = dataProxy.split(itemSeparator).map((item) => {
             return item
@@ -166,10 +173,16 @@ async function mkDirNotExists(arg) {
     }
 }
 async function bootstrap() {
-    const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
-    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-    const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
-    const QUERIES_DIR = dbconfig?.QUERIES_DIR || `${process.cwd()}/queries`;
+    let dbconfig;
+    try {
+        const rawConfig = await (0, promiseman_1.read)(`${process.cwd()}/dbconfig.json`, "utf8");
+        dbconfig = rawConfig ? JSON.parse(rawConfig) : DEFAULT_CONFIG;
+    }
+    catch (error) {
+        console.log("No config.json found, use defaults...");
+    }
+    store_1.store.set("dbconfig", dbconfig);
+    const { MODELS_DIR, QUERIES_DIR, DATA_DIR } = dbconfig;
     // create directories if not exist
     await mkDirNotExists(MODELS_DIR);
     await mkDirNotExists(QUERIES_DIR);
@@ -235,10 +248,10 @@ exports.bootstrap = bootstrap;
 // Save data to disk
 async function storeToCollection(name) {
     try {
-        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
-        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-        const magicKey = dbconfig?.magicKey || '12345';
-        const itemSeparator = dbconfig?.itemSeparator || "----------";
+        const dbconfig = store_1.store.get("dbconfig");
+        const DATA_DIR = dbconfig.DATA_DIR;
+        const magicKey = dbconfig.magicKey;
+        const itemSeparator = dbconfig.itemSeparator;
         const collection = store_1.store.get("collections")[name];
         const model = store_1.store.get("models")[name];
         if (!collection || !collection?.length) {
@@ -297,8 +310,8 @@ async function storeToCollection(name) {
 exports.storeToCollection = storeToCollection;
 async function writeStore() {
     try {
-        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
-        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+        const dbconfig = store_1.store.get("dbconfig");
+        const DATA_DIR = dbconfig.DATA_DIR;
         const collections = store_1.store.get("collections");
         const keys = Object.keys(collections);
         for (let x = 0; x < keys.length; x++) {
