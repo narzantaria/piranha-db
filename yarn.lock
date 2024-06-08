@@ -580,6 +580,15 @@ file-entry-cache@^8.0.0:
   dependencies:
     flat-cache "^4.0.0"
 
+file-handlers@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/file-handlers/-/file-handlers-0.0.1.tgz#3cffb03cbd7ec35082e08673d79840af31d90df5"
+  integrity sha512-9/Yc4lk06ueq3iFS1zqU6GpHlm8WMxlwgjIZEbboKuyqDFKs34SvtfGxR4mTBE9WtbwISBwn21yi94Q7KoJYEg==
+  dependencies:
+    crypto-js "^4.2.0"
+    fs-extra "^11.2.0"
+    promiseman "^0.0.1"
+
 fill-range@^7.1.1:
   version "7.1.1"
   resolved "https://registry.yarnpkg.com/fill-range/-/fill-range-7.1.1.tgz#44265d3cac07e3ea7dc247516380643754a05292"
@@ -1046,6 +1055,14 @@ prettier@^3.2.5:
   version "3.3.1"
   resolved "https://registry.yarnpkg.com/prettier/-/prettier-3.3.1.tgz#e68935518dd90bb7ec4821ba970e68f8de16e1ac"
   integrity sha512-7CAwy5dRsxs8PHXT3twixW9/OEll8MLE0VRPCJyl7CkS6VHGPSlsVaWTiASPTyGyYRyApxlaWTzwUxVNrhcwDg==
+
+promiseman@^0.0.1:
+  version "0.0.1"
+  resolved "https://registry.yarnpkg.com/promiseman/-/promiseman-0.0.1.tgz#306bb6fc80618800a4ab8f2f906734fa44ce2bf3"
+  integrity sha512-WV+AjyWLa3amqAsqksIj57xAMPQQetZyeG2mX9xScySqqtpAOpeZfBJWIjMRTtCvS66tMQj9/C5EOe+VGUfD3g==
+  dependencies:
+    fs-extra "^11.2.0"
+    util "^0.12.5"
 
 punycode@^2.1.0:
   version "2.3.1"

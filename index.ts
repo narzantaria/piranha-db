@@ -1,6 +1,5 @@
 import { store } from "./src/store";
-import { DATA_DIR, MODELS_DIR, QUERIES_DIR } from "./src/dirs";
-import { access, mkdir, read, readdir, unlink, write } from "./src/promises";
+import { access, mkdir, read, readdir, unlink, write } from "promiseman";
 import { IObject, INumObject } from "./src/types";
 import {
   parseField,
@@ -8,6 +7,7 @@ import {
   removeField,
   splitField,
 } from "./src/methods";
+import { readJSON } from "file-handlers";
 const { dbconfig } = require(`${process.cwd()}/dbconfig`);
 
 const { itemSeparator, magicKey } = dbconfig;
@@ -48,6 +48,8 @@ function parseObjectFields(obj: IObject, model: IObject) {
  * Read model (ORM), return IObject
  **/
 async function readModel(name: string): Promise<IObject> {
+  const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+  const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
   const modelProxy = await read(`${MODELS_DIR}/${name}.mod`, "utf8");
   return parseArrayToObject(
     modelProxy
@@ -63,6 +65,8 @@ async function readCollection(
   model?: IObject,
 ): Promise<IObject[]> {
   try {
+    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
     const dataProxy = await read(`${DATA_DIR}/${name}.dta`, "utf8");
     const qwerty = dataProxy.split(itemSeparator).map((item) => {
       return item
@@ -171,6 +175,10 @@ async function mkDirNotExists(arg: string): Promise<void> {
 }
 
 export async function bootstrap() {
+  const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+  const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+  const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+  const QUERIES_DIR = dbconfig?.QUERIES_DIR || `${process.cwd()}/queries`;
   // create directories if not exist
   await mkDirNotExists(MODELS_DIR);
   await mkDirNotExists(QUERIES_DIR);
@@ -241,6 +249,8 @@ export async function bootstrap() {
 // Save data to disk
 export async function storeToCollection(name: string): Promise<void> {
   try {
+    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
     const collection = store.get("collections")[name];
     const model: IObject = store.get("models")[name];
     if (!collection || !collection?.length) {
@@ -300,6 +310,8 @@ export async function storeToCollection(name: string): Promise<void> {
 
 export async function writeStore() {
   try {
+    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
     const collections = store.get("collections") as IObject;
     const keys = Object.keys(collections);
     for (let x = 0; x < keys.length; x++) {

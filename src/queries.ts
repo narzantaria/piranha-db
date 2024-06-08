@@ -1,12 +1,14 @@
-import { MODELS_DIR } from "./dirs";
+import { readJSON } from "file-handlers";
 import { filterFields, parseField, processRelation, removeRelations } from "./methods";
-import { access, lstat, stat } from "./promises";
+import { access, lstat, stat } from "promiseman";
 import { store } from "./store";
 import { IAggr, IObject, TOperator } from "./types";
 
 // check if the model file exists
 export async function checkModelExists(name: string): Promise<boolean> {
   try {
+    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
+    const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
     await access(`${MODELS_DIR}/${name}.mod`);
     return true;
   } catch (error) {
