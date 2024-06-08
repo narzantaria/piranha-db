@@ -7,7 +7,15 @@ import {
   removeField,
   splitField,
 } from "./src/methods";
-import { readJSON } from "file-handlers";
+
+const DEFAULT_CONFIG = {
+  "modelsFolder": "models",
+  "dataFolder": "db",
+  "queriesFolder": "queries",
+  "itemSeparator": "----------",
+  "joins": true,
+  "magicKey": "12345"
+};
 
 // parse array of lines to object
 function parseArrayToObject(arr: string[]): IObject {
@@ -45,8 +53,8 @@ function parseObjectFields(obj: IObject, model: IObject) {
  * Read model (ORM), return IObject
  **/
 async function readModel(name: string): Promise<IObject> {
-  const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
-  const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+  const dbconfig = store.get("dbconfig");
+  const MODELS_DIR = dbconfig.MODELS_DIR;
   const modelProxy = await read(`${MODELS_DIR}/${name}.mod`, "utf8");
   return parseArrayToObject(
     modelProxy
@@ -62,10 +70,10 @@ async function readCollection(
   model?: IObject,
 ): Promise<IObject[]> {
   try {
-    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
-    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-    const magicKey = dbconfig?.magicKey || '12345';
-    const itemSeparator = dbconfig?.itemSeparator || "----------";
+    const dbconfig = store.get("dbconfig");
+    const DATA_DIR = dbconfig.DATA_DIR;
+    const magicKey = dbconfig.magicKey;
+    const itemSeparator = dbconfig.itemSeparator;
     const dataProxy = await read(`${DATA_DIR}/${name}.dta`, "utf8");
     const qwerty = dataProxy.split(itemSeparator).map((item) => {
       return item
@@ -174,10 +182,15 @@ async function mkDirNotExists(arg: string): Promise<void> {
 }
 
 export async function bootstrap() {
-  const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
-  const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-  const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
-  const QUERIES_DIR = dbconfig?.QUERIES_DIR || `${process.cwd()}/queries`;
+  let dbconfig;
+  try {
+    const rawConfig = await read(`${process.cwd()}/dbconfig.json`, "utf8");
+    dbconfig = rawConfig ? JSON.parse(rawConfig) : DEFAULT_CONFIG;
+  } catch (error) {
+    console.log("No config.json found, use defaults...");
+  }
+  store.set("dbconfig", dbconfig);
+  const { MODELS_DIR, QUERIES_DIR, DATA_DIR } = dbconfig;
   // create directories if not exist
   await mkDirNotExists(MODELS_DIR);
   await mkDirNotExists(QUERIES_DIR);
@@ -248,10 +261,10 @@ export async function bootstrap() {
 // Save data to disk
 export async function storeToCollection(name: string): Promise<void> {
   try {
-    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
-    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
-    const magicKey = dbconfig?.magicKey || '12345';
-    const itemSeparator = dbconfig?.itemSeparator || "----------";
+    const dbconfig = store.get("dbconfig");
+    const DATA_DIR = dbconfig.DATA_DIR;
+    const magicKey = dbconfig.magicKey;
+    const itemSeparator = dbconfig.itemSeparator;
     const collection = store.get("collections")[name];
     const model: IObject = store.get("models")[name];
     if (!collection || !collection?.length) {
@@ -311,8 +324,8 @@ export async function storeToCollection(name: string): Promise<void> {
 
 export async function writeStore() {
   try {
-    const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
-    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+    const dbconfig = store.get("dbconfig");
+    const DATA_DIR = dbconfig.DATA_DIR;
     const collections = store.get("collections") as IObject;
     const keys = Object.keys(collections);
     for (let x = 0; x < keys.length; x++) {
