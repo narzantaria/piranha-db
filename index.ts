@@ -8,13 +8,22 @@ import {
   splitField,
 } from "./src/methods";
 
-const DEFAULT_CONFIG = {
-  "modelsFolder": "models",
-  "dataFolder": "db",
-  "queriesFolder": "queries",
-  "itemSeparator": "----------",
-  "joins": true,
-  "magicKey": "12345"
+interface IConfig {
+  "MODELS_DIR": string;
+  "DATA_DIR": string;
+  "QUERIES_DIR": string;
+  "ITEM_SEPARATOR": string;
+  "JOINS": boolean;
+  "MAGIC_KEY": string;
+}
+
+const DEFAULT_CONFIG: IConfig = {
+  "MODELS_DIR": "models",
+  "DATA_DIR": "db",
+  "QUERIES_DIR": "queries",
+  "ITEM_SEPARATOR": "----------",
+  "JOINS": true,
+  "MAGIC_KEY": "12345"
 };
 
 // parse array of lines to object
@@ -72,12 +81,12 @@ async function readCollection(
   try {
     const dbconfig = store.get("dbconfig");
     const DATA_DIR = dbconfig.DATA_DIR;
-    const magicKey = dbconfig.magicKey;
-    const itemSeparator = dbconfig.itemSeparator;
+    const MAGIC_KEY = dbconfig.MAGIC_KEY;
+    const ITEM_SEPARATOR= dbconfig.ITEM_SEPARATOR;
     const dataProxy = await read(`${DATA_DIR}/${name}.dta`, "utf8");
-    const qwerty = dataProxy.split(itemSeparator).map((item) => {
+    const qwerty = dataProxy.split(ITEM_SEPARATOR).map((item) => {
       return item
-        .replaceAll(magicKey, itemSeparator) // ??????????????????????
+        .replaceAll(MAGIC_KEY, ITEM_SEPARATOR) // ??????????????????????
         .split("\n")
         .map((line) => line.trim())
         .filter((line) => line !== "");
@@ -264,8 +273,8 @@ export async function storeToCollection(name: string): Promise<void> {
   try {
     const dbconfig = store.get("dbconfig");
     const DATA_DIR = dbconfig.DATA_DIR;
-    const magicKey = dbconfig.magicKey;
-    const itemSeparator = dbconfig.itemSeparator;
+    const MAGIC_KEY = dbconfig.MAGIC_KEY;
+    const ITEM_SEPARATOR= dbconfig.ITEM_SEPARATOR;
     const collection = store.get("collections")[name];
     const model: IObject = store.get("models")[name];
     if (!collection || !collection?.length) {
@@ -310,13 +319,13 @@ export async function storeToCollection(name: string): Promise<void> {
             let itemRow = `${objKey}: ${objProxy[objKey]}`
             // convert separator
             if (model) {
-              itemRow = itemRow.replaceAll(itemSeparator, magicKey);
+              itemRow = itemRow.replaceAll(ITEM_SEPARATOR, MAGIC_KEY);
             }
             return itemRow;
           })
           .join("\n");
       })
-      .join(`\n${itemSeparator}\n`);
+      .join(`\n${ITEM_SEPARATOR}\n`);
     await write(`${DATA_DIR}/${name}.dta`, data);
   } catch (error) {
     console.log(error);

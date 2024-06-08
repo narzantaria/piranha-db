@@ -70,12 +70,12 @@ In addition, you can create a configuration file at the root of your application
 
 ```json
 {
-  "modelsFolder": "models",
-  "dataFolder": "db",
-  "queriesFolder": "queries",
-  "itemSeparator": "----------",
-  "joins": true,
-  "magicKey": "12345"
+  "MODELS_DIR": "models",
+  "DATA_DIR": "db",
+  "QUERIES_DIR": "queries",
+  "ITEM_SEPARATOR": "----------",
+  "JOINS": true,
+  "MAGIC_KEY": "12345"
 }
 ```
 
