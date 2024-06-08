@@ -188,6 +188,7 @@ export async function bootstrap() {
     dbconfig = rawConfig ? JSON.parse(rawConfig) : DEFAULT_CONFIG;
   } catch (error) {
     console.log("No config.json found, use defaults...");
+    dbconfig = DEFAULT_CONFIG;
   }
   store.set("dbconfig", dbconfig);
   const { MODELS_DIR, QUERIES_DIR, DATA_DIR } = dbconfig;
