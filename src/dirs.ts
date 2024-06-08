@@ -1,4 +1,4 @@
-import { dbconfig } from "../dbconfig";
+const { dbconfig } = require(`${process.cwd()}/dbconfig.ts`);
 
 const { dataFolder, modelsFolder, queriesFolder } = dbconfig;
 
