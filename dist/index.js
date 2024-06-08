@@ -180,6 +180,7 @@ async function bootstrap() {
     }
     catch (error) {
         console.log("No config.json found, use defaults...");
+        dbconfig = DEFAULT_CONFIG;
     }
     store_1.store.set("dbconfig", dbconfig);
     const { MODELS_DIR, QUERIES_DIR, DATA_DIR } = dbconfig;
