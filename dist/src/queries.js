@@ -1,14 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.queryParser = exports.aggregate = exports.unRelate = exports.relate = exports.deleteOne = exports.updateOne = exports.getOne = exports.getAll = exports.insert = exports.checkCollectionExists = exports.checkModelExists = void 0;
-const dirs_1 = require("./dirs");
+const file_handlers_1 = require("file-handlers");
 const methods_1 = require("./methods");
-const promises_1 = require("./promises");
+const promiseman_1 = require("promiseman");
 const store_1 = require("./store");
 // check if the model file exists
 async function checkModelExists(name) {
     try {
-        await (0, promises_1.access)(`${dirs_1.MODELS_DIR}/${name}.mod`);
+        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+        const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+        await (0, promiseman_1.access)(`${MODELS_DIR}/${name}.mod`);
         return true;
     }
     catch (error) {

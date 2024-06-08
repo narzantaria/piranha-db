@@ -3,9 +3,9 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.updateOne = exports.unRelate = exports.relate = exports.queryParser = exports.insert = exports.getOne = exports.getAll = exports.deleteOne = exports.checkModelExists = exports.checkCollectionExists = exports.aggregate = exports.IJoin = exports.store = exports.writeStore = exports.storeToCollection = exports.bootstrap = exports.clearCollections = exports.clearOneCollection = exports.updateCollectionsAfterBuild = void 0;
 const store_1 = require("./src/store");
 Object.defineProperty(exports, "store", { enumerable: true, get: function () { return store_1.store; } });
-const dirs_1 = require("./src/dirs");
-const promises_1 = require("./src/promises");
+const promiseman_1 = require("promiseman");
 const methods_1 = require("./src/methods");
+const file_handlers_1 = require("file-handlers");
 const { dbconfig } = require(`${process.cwd()}/dbconfig`);
 const { itemSeparator, magicKey } = dbconfig;
 // parse array of lines to object
@@ -42,7 +42,9 @@ function parseObjectFields(obj, model) {
  * Read model (ORM), return IObject
  **/
 async function readModel(name) {
-    const modelProxy = await (0, promises_1.read)(`${dirs_1.MODELS_DIR}/${name}.mod`, "utf8");
+    const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+    const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+    const modelProxy = await (0, promiseman_1.read)(`${MODELS_DIR}/${name}.mod`, "utf8");
     return parseArrayToObject(modelProxy
         .split("\n")
         .filter((x, i) => i > 0)
@@ -51,7 +53,9 @@ async function readModel(name) {
 // read collection from db
 async function readCollection(name, model) {
     try {
-        const dataProxy = await (0, promises_1.read)(`${dirs_1.DATA_DIR}/${name}.dta`, "utf8");
+        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+        const dataProxy = await (0, promiseman_1.read)(`${DATA_DIR}/${name}.dta`, "utf8");
         const qwerty = dataProxy.split(itemSeparator).map((item) => {
             return item
                 .replaceAll(magicKey, itemSeparator) // ??????????????????????
@@ -142,7 +146,7 @@ exports.clearCollections = clearCollections;
 // check if directory exists
 async function checkFolderExists(dir) {
     try {
-        await (0, promises_1.access)(dir);
+        await (0, promiseman_1.access)(dir);
         return true;
     }
     catch (error) {
@@ -154,7 +158,7 @@ async function mkDirNotExists(arg) {
     try {
         const exists = await checkFolderExists(arg);
         if (!exists) {
-            await (0, promises_1.mkdir)(arg);
+            await (0, promiseman_1.mkdir)(arg);
         }
     }
     catch (error) {
@@ -162,15 +166,19 @@ async function mkDirNotExists(arg) {
     }
 }
 async function bootstrap() {
+    const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+    const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+    const MODELS_DIR = dbconfig?.MODELS_DIR || `${process.cwd()}/models`;
+    const QUERIES_DIR = dbconfig?.QUERIES_DIR || `${process.cwd()}/queries`;
     // create directories if not exist
-    await mkDirNotExists(dirs_1.MODELS_DIR);
-    await mkDirNotExists(dirs_1.QUERIES_DIR);
-    await mkDirNotExists(dirs_1.DATA_DIR);
+    await mkDirNotExists(MODELS_DIR);
+    await mkDirNotExists(QUERIES_DIR);
+    await mkDirNotExists(DATA_DIR);
     // model names
-    const modelFiles = await (0, promises_1.readdir)(dirs_1.MODELS_DIR);
+    const modelFiles = await (0, promiseman_1.readdir)(MODELS_DIR);
     const modelNames = modelFiles.map((x) => x.replace(/\.[^/.]+$/, ""));
     // Relational collections
-    const dataFiles = await (0, promises_1.readdir)(dirs_1.DATA_DIR);
+    const dataFiles = await (0, promiseman_1.readdir)(DATA_DIR);
     const relNames = dataFiles
         .map((x) => x.replace(/\.[^/.]+$/, ""))
         .filter((x) => !modelNames.includes(x));
@@ -227,6 +235,8 @@ exports.bootstrap = bootstrap;
 // Save data to disk
 async function storeToCollection(name) {
     try {
+        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
         const collection = store_1.store.get("collections")[name];
         const model = store_1.store.get("models")[name];
         if (!collection || !collection?.length) {
@@ -276,7 +286,7 @@ async function storeToCollection(name) {
                 .join("\n");
         })
             .join(`\n${itemSeparator}\n`);
-        await (0, promises_1.write)(`${dirs_1.DATA_DIR}/${name}.dta`, data);
+        await (0, promiseman_1.write)(`${DATA_DIR}/${name}.dta`, data);
     }
     catch (error) {
         console.log(error);
@@ -285,6 +295,8 @@ async function storeToCollection(name) {
 exports.storeToCollection = storeToCollection;
 async function writeStore() {
     try {
+        const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
+        const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
         const collections = store_1.store.get("collections");
         const keys = Object.keys(collections);
         for (let x = 0; x < keys.length; x++) {
@@ -292,7 +304,7 @@ async function writeStore() {
             if (!collections[key].length) {
                 // if the collection is empty the data will be deleted
                 try {
-                    await (0, promises_1.unlink)(`${dirs_1.DATA_DIR}/${key}.dta`);
+                    await (0, promiseman_1.unlink)(`${DATA_DIR}/${key}.dta`);
                 }
                 catch (error) {
                     console.log(`No '${key}' collection`);
