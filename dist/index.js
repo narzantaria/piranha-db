@@ -6,8 +6,6 @@ Object.defineProperty(exports, "store", { enumerable: true, get: function () { r
 const promiseman_1 = require("promiseman");
 const methods_1 = require("./src/methods");
 const file_handlers_1 = require("file-handlers");
-const { dbconfig } = require(`${process.cwd()}/dbconfig`);
-const { itemSeparator, magicKey } = dbconfig;
 // parse array of lines to object
 function parseArrayToObject(arr) {
     const obj = {};
@@ -55,6 +53,8 @@ async function readCollection(name, model) {
     try {
         const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
         const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+        const magicKey = dbconfig?.magicKey || '12345';
+        const itemSeparator = dbconfig?.itemSeparator || "----------";
         const dataProxy = await (0, promiseman_1.read)(`${DATA_DIR}/${name}.dta`, "utf8");
         const qwerty = dataProxy.split(itemSeparator).map((item) => {
             return item
@@ -237,6 +237,8 @@ async function storeToCollection(name) {
     try {
         const dbconfig = await (0, file_handlers_1.readJSON)(`${process.cwd()}/dbconfig.json`);
         const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+        const magicKey = dbconfig?.magicKey || '12345';
+        const itemSeparator = dbconfig?.itemSeparator || "----------";
         const collection = store_1.store.get("collections")[name];
         const model = store_1.store.get("models")[name];
         if (!collection || !collection?.length) {
