@@ -6,7 +6,7 @@ Object.defineProperty(exports, "store", { enumerable: true, get: function () { r
 const dirs_1 = require("./src/dirs");
 const promises_1 = require("./src/promises");
 const methods_1 = require("./src/methods");
-const { dbconfig } = require(`${process.cwd()}/dbconfig.ts`);
+const { dbconfig } = require(`${process.cwd()}/dbconfig`);
 const { itemSeparator, magicKey } = dbconfig;
 // parse array of lines to object
 function parseArrayToObject(arr) {

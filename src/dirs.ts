@@ -1,4 +1,4 @@
-const { dbconfig } = require(`${process.cwd()}/dbconfig.ts`);
+const { dbconfig } = require(`${process.cwd()}/dbconfig`);
 
 const { dataFolder, modelsFolder, queriesFolder } = dbconfig;
 

@@ -1,6 +1,6 @@
 {
   "name": "piranha-db",
-  "version": "1.0.12",
+  "version": "1.0.13",
   "main": "dist/index.js",
   "repository": "https://github.com/narzantaria/piranha-db.git",
   "author": "Nar Zantaria <narzantaria@gmail.com>",
@@ -8,7 +8,8 @@
   "scripts": {
     "build": "tsc",
     "lint": "npx eslint . --ext .js,.ts --fix",
-    "prettier": "npx prettier --write ."
+    "prettier": "npx prettier --write .",
+    "postinstall": "if [ -f tsconfig.json ]; then mv node_modules/dbconfig.ts dbconfig.ts; else mv node_modules/dbconfig.js dbconfig.js; fi"
   },
   "files": [
     "dist",

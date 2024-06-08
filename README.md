@@ -65,8 +65,10 @@ process.on("SIGINT", async () => {
   });
 });
 ```
-
+<!--
 In addition, you need to create a configuration file at the root of your application or server with the name **dbconfig.ts**.
+-->
+**dbconfig.ts** is the configuration file that will be automatically created one time after install. 
 
 ```javascript
 export const dbconfig = {

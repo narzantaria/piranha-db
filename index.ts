@@ -8,7 +8,7 @@ import {
   removeField,
   splitField,
 } from "./src/methods";
-const { dbconfig } = require(`${process.cwd()}/dbconfig.ts`);
+const { dbconfig } = require(`${process.cwd()}/dbconfig`);
 
 const { itemSeparator, magicKey } = dbconfig;
 
