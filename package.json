@@ -1,6 +1,6 @@
 {
   "name": "piranha-db",
-  "version": "1.0.13",
+  "version": "1.0.14",
   "main": "dist/index.js",
   "repository": "https://github.com/narzantaria/piranha-db.git",
   "author": "Nar Zantaria <narzantaria@gmail.com>",
