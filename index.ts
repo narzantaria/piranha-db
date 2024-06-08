@@ -8,9 +8,6 @@ import {
   splitField,
 } from "./src/methods";
 import { readJSON } from "file-handlers";
-const { dbconfig } = require(`${process.cwd()}/dbconfig`);
-
-const { itemSeparator, magicKey } = dbconfig;
 
 // parse array of lines to object
 function parseArrayToObject(arr: string[]): IObject {
@@ -67,6 +64,8 @@ async function readCollection(
   try {
     const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
     const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+    const magicKey = dbconfig?.magicKey || '12345';
+    const itemSeparator = dbconfig?.itemSeparator || "----------";
     const dataProxy = await read(`${DATA_DIR}/${name}.dta`, "utf8");
     const qwerty = dataProxy.split(itemSeparator).map((item) => {
       return item
@@ -251,6 +250,8 @@ export async function storeToCollection(name: string): Promise<void> {
   try {
     const dbconfig = await readJSON(`${process.cwd()}/dbconfig.json`) as IObject | null;
     const DATA_DIR = dbconfig?.DATA_DIR || `${process.cwd()}/db`;
+    const magicKey = dbconfig?.magicKey || '12345';
+    const itemSeparator = dbconfig?.itemSeparator || "----------";
     const collection = store.get("collections")[name];
     const model: IObject = store.get("models")[name];
     if (!collection || !collection?.length) {
